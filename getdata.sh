@@ -1,7 +1,6 @@
 #!/bin/bash
 
 download () {
-    echo "Checking $1..."    
     if curl --head -silent --fail $3; then
     if test -f "trips/$2.csv"; then
     echo "$2.csv already exists..."
@@ -18,8 +17,9 @@ for month in {1..12}
 do
 for name in $year$month "${year}0${month}"
 do
-for url in https://s3.amazonaws.com/tripdata/$name-citibike-tripdata.zip https://s3.amazonaws.com/tripdata/$name-citibike-tripdata.csv.zip
+for end in ".csv.zip" ".zip"
 do
+url=https://s3.amazonaws.com/tripdata/$name-citibike-tripdata$end
 filename="${year}_${month}"
 download $name $filename $url
 done
