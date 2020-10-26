@@ -19,7 +19,7 @@ for month in {1..12}
 do
 for name in $year$month "${year}0${month}"
 do
-filename="${year}${month}"
+filename="${year}_${month}"
 download $name $filename
 done
 done
