@@ -1,6 +1,6 @@
 library(dplyr)
 
-combined1 <- read.csv("data/combined1.csv")
+combined1 <- read.csv("data/input.csv")
 weather <- read.csv("data/weather.csv")
 
 combined1$standarddate <- as.Date(combined1$date, "%m/%d/%Y")
@@ -11,6 +11,6 @@ skinyweather <- weather %>%
 
 combined2 <- inner_join(combined1, skinyweather, by="standarddate")
 
-write.csv(combined2, "data/combined2.csv")
+write.csv(combined2, "data/data.csv")
 
 
