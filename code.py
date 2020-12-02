@@ -5,6 +5,7 @@ from sklearn.neural_network import MLPClassifier
 from sklearn import preprocessing
 
 def preprocess(filename):
+    ''' preprocess file '''
     # Read csv
     df = pd.read_csv(filename)
     # Drop empty values (some speeds are not provided)
@@ -23,10 +24,12 @@ def preprocess(filename):
     return df, dfy
 
 def selectdf(dfx, dfy, youtcome):
+    ''' rows in dfx that correspond to youtcome in dfy '''
     idx = dfy.index[dfy['y']==youtcome]
     return dfx.iloc[idx,:], dfy.iloc[idx,:]
 
 def balanced(dfx, dfy):
+    ''' return subset of dfx with equal number of 0 and 1 rows '''
     negdfx, negdfy = selectdf(dfx, dfy, 0)
     posdfx, posdfy = selectdf(dfx, dfy, 1)
     negidx = np.random.choice(len(negdfx), len(posdfx), replace=False)
@@ -45,7 +48,8 @@ def smalldata():
     smalltrain.to_csv('data/smalltrain.csv', index=False)
     smalltest.to_csv('data/smalltest.csv', index=False)
 
-def evalbalanced(trainfile, testfile, classifier, reps=10, verbose=True):    
+def evalbalancedclassifier(trainfile, testfile, classifier, reps=10, verbose=True):    
+    ''' evaluate classifier on training, positive tests, and negative tests '''
     trainaccuracy, posaccuracy, negaccuracy = 0, 0, 0
     trainx, trainy = preprocess('data/smalltrain.csv')    
     testx, testy = preprocess('data/smalltest.csv')
@@ -61,9 +65,47 @@ def evalbalanced(trainfile, testfile, classifier, reps=10, verbose=True):
         print('Test Negative Error', 1-negaccuracy/reps)
     return trainaccuracy/reps, posaccuracy/reps, negaccuracy/reps
 
-print("Logistic Regression")
-evalbalanced('data/smalltrain.csv', 'data/smalltest.csv', LogisticRegression)
-print("Multilayer Perceptron")
-evalbalanced('data/smalltrain.csv', 'data/smalltest.csv', MLPClassifier)
+def erroraggregate(model1, model2, dfx, dfy):
+    ''' return error of aggregating model1 and model2 predictions '''
+    pred = pd.DataFrame(data=dfy['y'], columns=['y'])
+    pred['max1'] = model1.predict_proba(dfx).max(axis=1)
+    pred['max2'] = model2.predict_proba(dfx).max(axis=1) 
+    pred['greater1'] = pred['max1'] >= pred['max2']
+    pred['greater2'] = pred['max1'] < pred['max2']
+    pred['pred'] = pred['greater1']*model1.predict(dfx) + pred['greater2']*model2.predict(dfx)
+    return np.mean(pred['pred'] != pred['y'])
 
+def evalbalanced(trainfile, testfile, reps=10, verbose=True):
+    ''' evaluate the performacne of Logistic Regression,
+    Multilayer Perceptron, and aggregation of the two '''
+    testx, testy = preprocess(trainfile)
+    trainx, trainy = preprocess(testfile)
+    errors = []
+    for rep in range(reps):
+        balx, baly = balanced(trainx, trainy)
+        model1 = LogisticRegression(random_state=0).fit(balx, baly['y'])
+        model2 = MLPClassifier(random_state=0).fit(balx, baly['y'])
+        train1 = 1-model1.score(balx, baly) 
+        pos1 = 1-model1.score(*selectdf(testx, testy, 1))
+        neg1 = 1-model1.score(*selectdf(testx, testy, 0))
+        train2 = 1-model2.score(balx, baly) 
+        pos2 = 1-model2.score(*selectdf(testx, testy, 1))
+        neg2 = 1-model2.score(*selectdf(testx, testy, 0))
+        train = erroraggregate(model1, model2, balx, baly)
+        pos = erroraggregate(model1, model2, *selectdf(testx,testy,1)) 
+        neg = erroraggregate(model1, model2, *selectdf(testx,testy,0))
+        errors += [[train1,pos1,neg1,train2,pos2,neg2,train,pos,neg]]
 
+    df = pd.DataFrame(
+        data=errors,
+        columns=['train1','pos1','neg1','train2','pos2','neg2','train','pos','neg']
+    )
+    if verbose:
+        print(df.mean(axis=0))
+    return df.mean(axis=0)
+
+#print("Logistic Regression")
+#evalbalancedclassifier('data/smalltrain.csv', 'data/smalltest.csv', LogisticRegression)
+#print("Multilayer Perceptron")
+#evalbalancedclassifier('data/smalltrain.csv', 'data/smalltest.csv', MLPClassifier)
+evalbalanced('data/smalltrain.csv', 'data/smalltest.csv', reps=20)
