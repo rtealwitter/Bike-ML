@@ -2,12 +2,16 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
 from sklearn.neural_network import MLPClassifier
+from sklearn.svm import LinearSVC
 from sklearn import preprocessing
 
-def preprocess(filename):
+def preprocess(data, filename=True):
     ''' preprocess file '''
-    # Read csv
-    df = pd.read_csv(filename)
+    if filename:
+        # Read csv
+        df = pd.read_csv(data)
+    else:
+        df = data
     # Drop empty values (some speeds are not provided)
     df = df.dropna()
     # Actual values
@@ -39,6 +43,7 @@ def balanced(dfx, dfy):
 
 def smalldata():
     ''' Subset data for easier loading '''
+    # np.random.seed(1)
     df = pd.read_csv('data/data.csv')
     m = len(df)
     shuffledidx = np.random.permutation(list(range(m)))
@@ -78,8 +83,8 @@ def erroraggregate(model1, model2, dfx, dfy):
 def evalbalanced(trainfile, testfile, reps=10, verbose=True):
     ''' evaluate the performacne of Logistic Regression,
     Multilayer Perceptron, and aggregation of the two '''
-    testx, testy = preprocess(trainfile)
-    trainx, trainy = preprocess(testfile)
+    testx, testy = preprocess(testfile)
+    trainx, trainy = preprocess(trainfile)
     errors = []
     for rep in range(reps):
         balx, baly = balanced(trainx, trainy)
@@ -104,8 +109,45 @@ def evalbalanced(trainfile, testfile, reps=10, verbose=True):
         print(df.mean(axis=0))
     return df.mean(axis=0)
 
+def agginput(model1, model2, dfx, dfy):
+    agg = pd.DataFrame(dfy.copy())
+    agg['prob1'] = model1.predict_proba(dfx)[:,0] 
+    agg['prob2'] = model2.predict_proba(dfx)[:,0]
+    return agg[['prob1', 'prob2']], agg['y']
+
+def aggregate(testx, testy, trainx, trainy):
+    balx, baly = balanced(trainx, trainy)
+    model1 = LogisticRegression(random_state=0).fit(balx, baly['y'])
+    print('Model1')
+    print(1-model1.score(*selectdf(testx,testy,1)))
+    print(1-model1.score(*selectdf(testx,testy,0)))
+    model2 = MLPClassifier(random_state=0).fit(balx, baly['y'])
+    print('Model2')
+    print(1-model2.score(*selectdf(testx,testy,1)))
+    print(1-model2.score(*selectdf(testx,testy,0)))
+    aggx, aggy = agginput(model1, model2, balx, baly['y'])
+    model3 = LinearSVC().fit(aggx, aggy)
+    print('Model Combined')
+    print(1-model3.score(*agginput(model1, model2, *selectdf(testx,testy,1))))
+    print(1-model3.score(*agginput(model1, model2, *selectdf(testx,testy,0))))
+
 #print("Logistic Regression")
 #evalbalancedclassifier('data/smalltrain.csv', 'data/smalltest.csv', LogisticRegression)
 #print("Multilayer Perceptron")
 #evalbalancedclassifier('data/smalltrain.csv', 'data/smalltest.csv', MLPClassifier)
-evalbalanced('data/smalltrain.csv', 'data/smalltest.csv', reps=20)
+#evalbalanced('data/smalltrain.csv', 'data/smalltest.csv', reps=50)
+
+np.random.seed(1)
+#testx, testy = preprocess('data/smalltest.csv')
+#trainx, trainy = preprocess('data/smalltrain.csv')
+
+df = pd.read_csv('data/data.csv')
+m = len(df)
+shuffledidx = np.random.permutation(list(range(m)))
+# Training and testing sets from the other half of the data
+idxtest, idxtrain = shuffledidx[:(m//5)], shuffledidx[(m//5):]
+train, test = df.iloc[idxtrain,:], df.iloc[idxtest,:]
+trainx, trainy = preprocess(train, filename=False)
+testx, testy = preprocess(test, filename=False)
+
+aggregate(testx, testy, trainx, trainy)
