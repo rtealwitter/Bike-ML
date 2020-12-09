@@ -51,19 +51,22 @@ def printresults(results):
         for key2 in results[key]:
             print(key2, results[key][key2])
 
-#pretrainx, pretrainy = preprocess('data/smalltrain.csv')
-#testx, testy = preprocess('data/smalltest.csv')
+def experiment(usefulldata):
+    print('Loading data...')
+    if usefulldata:
+        pretrainx, pretrainy, testx, testy = fulldata()
+    else:
+        pretrainx, pretrainy = preprocess('data/smalltrain.csv')
+        testx, testy = preprocess('data/smalltest.csv')
 
-print('Loading data...')
-pretrainx, pretrainy, testx, testy = fulldata()
+    print('Starting modeling...')
+    modelsresults = wrapper(pretrainx, pretrainy, testx, testy, evaluatemodels, T=10)
+    printresults(modelsresults)
+    writeresults('modelsresults.txt', modelsresults)
 
-print('Starting modeling...')
-modelsresults = wrapper(pretrainx, pretrainy, testx, testy, evaluatemodels, T=10)
-printresults(modelsresults)
-writeresults('modelsresults.txt', modelsresults)
+    print('Starting boosting...')
+    boostresults = wrapper(pretrainx, pretrainy, testx, testy, evaluateboost, T=25)
+    printresults(boostresults)
+    writeresults('boostingresults.txt', boostresults)
 
-print('Starting boosting...')
-boostresults = wrapper(pretrainx, pretrainy, testx, testy, evaluateboost, T=25)
-printresults(boostresults)
-writeresults('boostingresults.txt', boostresults)
-
+experiment(usefulldata=True)
