@@ -2,22 +2,51 @@
 Final project for Professor Mohri's Fall 2020
 Foundations of Machine Learning.
 
-# Files
+# Goal
+The objective is to predict when and where
+bike collisions occur in Manhattan.
+Each observation in our dataset corresponds to a zone
+(several blocks) at a particular hour in either 2018 or 2019.
+We would like to classify each observation as either
+containing a collision in that zone and hour or not.
+As you might expect, the classes are highly imbalanced.
+Of the nearly 3,000,000 observations, only about
+1,800 contain collisions.
+A machine learning model could take advantage of the
+discrepancy and simply by predicting no collision
+could achieve an error rate less than .1%.
+Therefore we rely on a series of data preparation
+techniques (e.g. resampling, reweighting)
+and models (e.g. logistic regression, linear SVM,
+neural network, custom aggregation model, and boosting)
+to achieve a lower error rate on the observations
+with collisions while simultaneously supressing the
+error rate on observations without collisions.
+
+# Data
 * `weather.csv` is the daily weather data from the station at JFK from 1/1/2017 to 12/31/2019
 and includes columns `AWND` through `WSF2`
-* `combined1.csv` (formerly `combined_cb_ct_collision_0.csv`) contains columns `datetime` through `ncoll`
-* `combined2.csv` is the [inner_join](https://www.rdocumentation.org/packages/plyr/versions/1.8.6/topics/join)
-of `combined1.csv` and weather on `standarddate`
+* `data.csv` contains the full data set (including `weather.csv`)
+* `smalltrain.csv` contains 100,000 randomly selected observations used for training while working on the implementation
+* `smalltest.csv` contains 100,000 randomly selected observations used for testing while working on the implementation
 
-# Transferring Large Files
+# Building the data files.
 GitHub only allows files of size 50MB so we had to 
-split and compress `combined1.csv` and `combined2.csv`.
-In order to reconstruct both files, you must run
+split and compress `data.csv` into three files.
+In order to reconstruct `data.csv`, you must run
 `bash handledata.sh` from the command line in the
-top level directory.
+top level of the repository.
 
+# Running the Code
+Run `python3 experiment.py` from the command line
+in the top level of the repository.
+As currently written, the program will run on the full dataset
+which is *very* computationally intensive.
+Switching the flat `usefulldata` to `False` while
+run the training and testing on the `smalltrain.csv` and
+`smalltest.csv` instead.
 
-# Columns
+# Features
 * `datetime`
 * `GEOID`: tract ID, combination of state, county, and area code (**turn this into binary features**)
 * `date`
@@ -39,6 +68,11 @@ top level directory.
 * `age_bins_25-44_out`
 * `age_bins_44-65_out`
 * `age_bins_44-65_out`
+* `day`
+* `year`
+* `speed_mph_mean`: Mean of Uber's speeds in the GEOID zone (not always available)
+* `speed_mph_stddev: Standard deviation of Uber's speeds in the GEOID zone (not always available)
+* `standarddate`
 * `NAME_1`: Name of GEOID
 * `ncoll`: Number of collisions (**variable we will predict**)
 * `AWND`: Average daily wind speed (miles per hour)
