@@ -4,6 +4,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.neural_network import MLPClassifier
 from sklearn.svm import LinearSVC
 from sklearn import preprocessing
+from sklearn.base import clone
 import cProfile
 
 def preprocess(data, filename=True):
@@ -28,7 +29,8 @@ def preprocess(data, filename=True):
     df = pd.DataFrame(preprocessing.scale(df), columns=df.columns)
     return df, dfy
 
-def fulldata():
+def fulldata(seed=True):
+    if seed: np.random.seed(1)
     df = pd.read_csv('data/data.csv')
     m = len(df)
     shuffledidx = np.random.permutation(list(range(m)))
@@ -101,22 +103,28 @@ class AggregateModel():
         return self.model.score(
             *aggregateinput(self.regress, self.neuraln, self.linesvm, X, y))
 
-def adaboost(X, y, T, classifier):
+def adaboost(X, y, T, classifier, verbose):
     evaluation = pd.DataFrame(y.copy())
     evaluation['distribution'] = 1/len(y)
     alphas, models = [], []
     for t in range(T):
         # Build weak learner
-        model = classifier.fit(
+        print('Training SVM for boosting...')
+        model = clone(classifier).fit(
             X, y, sample_weight=np.array(evaluation['distribution']))
-        models.append(model)
         evaluation['prediction'] = model.predict(X)
         evaluation['outcome'] = evaluation['prediction'] * evaluation['y']
         error = np.sum(
             evaluation['distribution'] * (evaluation['outcome'] < 1))
+        if error >= .5: return alphas, models
         assert error < .5 # Ensure error below .5 on distribution
         alpha = .5*np.log((1-error)/error)
+        models.append(model)
         alphas.append(alpha)
+        if verbose:
+            print('Boosting round:', t)
+            print('Boosting error:', error)
+        if error == 0: return alphas, models
         Z = 2*np.sqrt(error*(1-error))
         # Update distribution according to AdaBoost rule
         evaluation['distribution'] = evaluation['distribution'] * np.exp(
@@ -127,17 +135,18 @@ def adaboost(X, y, T, classifier):
 class BoostModel():
     def __init__(self, class_weight=None):
         self.classifier = LinearSVC(class_weight=class_weight)
-    def fit(self, X, y, T):
-        self.alphas, self.models = adaboost(X, y, T, self.classifier)
+    def fit(self, X, y, T, verbose=False):
+        self.alphas, self.models = adaboost(X, y, T, self.classifier, verbose)
         return self
-    def predict(self, X, y=None):
+    def predict(self, X, T=None):
         prediction = np.zeros((1, len(X)))
-        for i in range(len(self.alphas)):
+        iterations = len(self.alphas) if T==None else T
+        for i in range(iterations):
             currentprediction = np.array(self.models[i].predict(X))
             prediction = np.add(self.alphas[i]*currentprediction, prediction)
         return pd.DataFrame(data=np.sign(prediction).transpose(), columns=['prediction'])
-    def score(self, X, y):
-        return np.mean(np.array(self.predict(X, y)) == np.array(y))
+    def score(self, X, y, T=None):
+        return np.mean(np.array(self.predict(X, T)) == np.array(y))
 
 # Testing
 def selectdf(dfx, dfy, youtcome):
@@ -158,3 +167,6 @@ def margin(dfy):
     poscoeff = (len(dfy.index[dfy['y']==1])**(1/4))
     negcoeff = (len(dfy.index[dfy['y']==-1])**(1/4))
     return {1: 1/poscoeff, -1: 1/negcoeff}
+
+def nomargin(dfy):
+    return None
