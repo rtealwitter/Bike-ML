@@ -71,7 +71,7 @@ run the training and testing on the `smalltrain.csv` and
 * `day`
 * `year`
 * `speed_mph_mean`: Mean of Uber's speeds in the GEOID zone (not always available)
-* `speed_mph_stddev: Standard deviation of Uber's speeds in the GEOID zone (not always available)
+* `speed_mph_stddev`: Standard deviation of Uber's speeds in the GEOID zone (not always available)
 * `standarddate`
 * `NAME_1`: Name of GEOID
 * `ncoll`: Number of collisions (**variable we will predict**)
