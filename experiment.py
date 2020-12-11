@@ -6,13 +6,15 @@ from toolbox import *
 
 def evaluatemodels(trainx, trainy, testx, testy, class_weight, T):
     models = {
-        'Regression': LogisticRegression(class_weight=class_weight).fit(trainx, trainy['y']),
-        'Linear SVM': LinearSVC(class_weight=class_weight).fit(trainx, trainy['y']),
-        'Neural Net': MLPClassifier().fit(trainx, trainy['y']),
+        'Regression': LogisticRegression(random_state=0, class_weight=class_weight).fit(trainx, trainy['y']),
+        'Neural Net': MLPClassifier(random_state=0).fit(trainx, trainy['y']),
         'Boost SVM': BoostModel(class_weight=class_weight).fit(trainx, trainy['y'], T=T)
     }
-    models['Aggregate'] = AggregateModel(
-        models['Regression'], models['Neural Net'], models['Linear SVM'],
+    models['AggregateSVM'] = AggregateModelSVM(
+        models['Regression'], models['Neural Net'],
+        class_weight=class_weight).fit(trainx, trainy['y'])
+    models['AggregateHeuristic'] = AggregateModelHeuristic(
+        models['Regression'], models['Neural Net'],
         class_weight=class_weight).fit(trainx, trainy['y'])
     return scoremodels(models, testx, testy)
 
@@ -29,10 +31,11 @@ def evaluateboost(trainx, trainy, testx, testy, class_weight, T):
 def wrapper(pretrainx, pretrainy, testx, testy, procedure, T, seed=True):
     if seed: np.random.seed(1)
     results = {}
-    datastrategies = {'Reweight': reweight, 'Resample': unsample}
+    datastrategies = {'Resample': unsample, 'Reweight': reweight}
     marginstrategies = {'Margin': margin, 'None': nomargin}
     for datastrategy in datastrategies:
         print('Strategizing data...')
+        if seed: np.random.seed(1)
         trainx, trainy = datastrategies[datastrategy](pretrainx, pretrainy)
         for marginstrategy in marginstrategies:
             print('Current configuration:', datastrategy, marginstrategy)
@@ -54,19 +57,19 @@ def printresults(results):
 def experiment(usefulldata):
     print('Loading data...')
     if usefulldata:
-        pretrainx, pretrainy, testx, testy = fulldata()
+        pretrainx, pretrainy, testx, testy = fulldata(seed=True)
     else:
         pretrainx, pretrainy = preprocess('data/smalltrain.csv')
         testx, testy = preprocess('data/smalltest.csv')
-
-    print('Starting modeling...')
-    modelsresults = wrapper(pretrainx, pretrainy, testx, testy, evaluatemodels, T=10)
-    printresults(modelsresults)
-    writeresults('modelsresults.txt', modelsresults)
 
     print('Starting boosting...')
     boostresults = wrapper(pretrainx, pretrainy, testx, testy, evaluateboost, T=25)
     printresults(boostresults)
     writeresults('boostingresults.txt', boostresults)
+
+    print('Starting modeling...')
+    modelsresults = wrapper(pretrainx, pretrainy, testx, testy, evaluatemodels, T=10)
+    printresults(modelsresults)
+    writeresults('modelsresults.txt', modelsresults)
 
 experiment(usefulldata=True)

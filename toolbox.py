@@ -78,30 +78,42 @@ def reweight(dfx, dfy):
     return newdfx, newdfy
 
 # Models
-def aggregateinput(regress, neuraln, linesvm, dfx, dfy):
+def aggregateinput(regress, neuraln, dfx, dfy):
     df = pd.DataFrame(dfy.copy())
     df['regress probability'] = regress.predict_proba(dfx)[:,0] 
-    df['regress predict'] = regress.predict_proba(dfx)[:,0] 
+    df['regress predict'] = regress.predict(dfx)
     df['regress decision'] = regress.decision_function(dfx)
     df['neuraln probability'] = neuraln.predict_proba(dfx)[:,0]
     df['neuraln predict'] = neuraln.predict(dfx)
-    df['linesvm predict'] = linesvm.predict(dfx)
-    df['linesvm decision'] = linesvm.decision_function(dfx)
     return df.drop(columns=['y']), df['y']
 
-class AggregateModel():
-    def __init__(self, regress, neuraln, linesvm, class_weight=None):
+class AggregateModelSVM():
+    def __init__(self, regress, neuraln, class_weight=None):
         self.regress = regress
         self.neuraln = neuraln
-        self.linesvm = linesvm
         self.class_weight = class_weight
     def fit(self, X, y):
-        self.model = LinearSVC(class_weight=self.class_weight).fit(
-            *aggregateinput(self.regress, self.neuraln, self.linesvm, X, y))
+        self.model = LinearSVC(random_state=0, class_weight=self.class_weight).fit(
+            *aggregateinput(self.regress, self.neuraln, X, y))
         return self
     def score(self, X, y):
         return self.model.score(
-            *aggregateinput(self.regress, self.neuraln, self.linesvm, X, y))
+            *aggregateinput(self.regress, self.neuraln, X, y))
+
+class AggregateModelHeuristic():
+    def __init__(self, regress, neuraln, class_weight=None):
+        self.regress = regress
+        self.neuraln = neuraln
+        self.class_weight = class_weight
+    def fit(self, X, y):
+        return self
+    def predict(self, X):
+        prediction = np.sign(
+            self.regress.predict_proba(X).max(axis=1) * self.regress.predict(X)
+            + self.neuraln.predict_proba(X).max(axis=1) * self.neuraln.predict(X))
+        return pd.DataFrame(data=np.sign(prediction).transpose(), columns=['prediction'])
+    def score(self, X, y):
+        return np.mean(np.array(self.predict(X)) == np.array(y))
 
 def adaboost(X, y, T, classifier, verbose):
     evaluation = pd.DataFrame(y.copy())
@@ -115,8 +127,10 @@ def adaboost(X, y, T, classifier, verbose):
         evaluation['prediction'] = model.predict(X)
         evaluation['outcome'] = evaluation['prediction'] * evaluation['y']
         error = np.sum(
-            evaluation['distribution'] * (evaluation['outcome'] < 1))
-        if error >= .5: return alphas, models
+            evaluation['distribution'] * (evaluation['outcome'] < 1))        
+        if error > .5:
+            print('Error above .5, flipping prediction...')
+            error = 1-error
         assert error < .5 # Ensure error below .5 on distribution
         alpha = .5*np.log((1-error)/error)
         models.append(model)
@@ -124,17 +138,20 @@ def adaboost(X, y, T, classifier, verbose):
         if verbose:
             print('Boosting round:', t)
             print('Boosting error:', error)
-        if error == 0: return alphas, models
+        if error == 0:
+            print('Returning because of low error:', error)
+            return alphas, models
         Z = 2*np.sqrt(error*(1-error))
         # Update distribution according to AdaBoost rule
         evaluation['distribution'] = evaluation['distribution'] * np.exp(
             -alpha*evaluation['outcome'])/Z
+        evaluation['distribution'] = evaluation['distribution']/np.sum(evaluation['distribution'])
         assert np.allclose(np.sum(evaluation['distribution']), 1)
     return alphas, models
 
 class BoostModel():
     def __init__(self, class_weight=None):
-        self.classifier = LinearSVC(class_weight=class_weight)
+        self.classifier = LinearSVC(random_state=0, class_weight=class_weight)
     def fit(self, X, y, T, verbose=False):
         self.alphas, self.models = adaboost(X, y, T, self.classifier, verbose)
         return self
