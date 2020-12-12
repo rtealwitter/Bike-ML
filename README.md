@@ -67,7 +67,7 @@ run the training and testing on the `smalltrain.csv` and
 * `age_bins_18-24_out`
 * `age_bins_25-44_out`
 * `age_bins_44-65_out`
-* `age_bins_44-65_out`
+* `age_bins_65P_out`
 * `day`
 * `year`
 * `speed_mph_mean`: Mean of Uber's speeds in the GEOID zone (not always available)
